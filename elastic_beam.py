@@ -14,29 +14,40 @@
 
 
 import matplotlib.pyplot as plt
+from matplotlib.animation import FuncAnimation
+
 import numpy as np
 from mpi4py import MPI
 import basix
 from petsc4py import PETSc
-from dolfinx.fem import (Function, FunctionSpace, dirichletbc, form,
-                         locate_dofs_topological, Constant, Expression)
-# from dolfinx.io import VTKFile
-# from dolfinx.fem.petsc import LinearProblem
+from dolfinx.fem import (
+    Function, FunctionSpace, dirichletbc, form, assemble_scalar, set_bc, locate_dofs_topological, Constant, Expression
+)
+from dolfinx.geometry import BoundingBoxTree, compute_collisions, compute_colliding_cells
 from dolfinx.fem.petsc import assemble_matrix, assemble_vector		# https://docs.fenicsproject.org/dolfinx/main/python/generated/dolfinx.fem.petsc.html
-from dolfinx.fem import assemble_scalar, locate_dofs_topological, dirichletbc
-from dolfinx.mesh import locate_entities_boundary, create_interval
-from ufl import (SpatialCoordinate, inner, TestFunctions, TrialFunctions, nabla_grad, nabla_div, dx, MixedElement, TestFunction, TrialFunction)
+from dolfinx.mesh import locate_entities_boundary, create_interval, locate_entities
+from ufl import (SpatialCoordinate, inner, nabla_grad, nabla_div, dx, MixedElement, TestFunction, TrialFunction)
 from scipy.optimize import fsolve
 
-from scipy.integrate import solve_ivp
+
+"""
+valid configs: 
+T = 5, steps = 150, element = 50, tau = 0.1 * sin(1.5t), alpha_initial = 0.3
+
+"""
 
 
-NUM_ELEMENTS = 10
-NUM_TIME_STEPS = 100
-T = 1.0
+NUM_ELEMENTS = 50
+NUM_TIME_STEPS = 150
+T = 5 # 7.5
 
 
-def tau(t): return 0.1 * np.sin(t)
+def tau(t):
+    amp = 0.1
+    freq = 5 # 1.
+    return amp * np.cos(freq * t)
+
+# def tau(t): return 0.1 * np.exp(-t)
 
 
 L = 1.1               # beam length
@@ -48,8 +59,8 @@ R = 0.1               # radius of rigid hub
 I_h = 3.84             # mass moment of inertia of hub
 
 # initial rotation position and velocity of hub beam system
-theta_initial = np.pi / 2
-alpha_initial = 0
+theta_initial = 0   # -45 * (np.pi / 180)   # np.pi / 2
+alpha_initial = 0   # 0.3
 
 
 mesh = create_interval(MPI.COMM_WORLD, NUM_ELEMENTS, [0, L])
@@ -85,12 +96,19 @@ z = TestFunction(v_function_space)
 left_boundary = locate_entities_boundary(
     mesh, mesh.topology.dim-1, lambda s: np.isclose(s[0], 0)
 )
+# right_boundary = locate_entities_boundary(
+#     mesh, mesh.topology.dim-1, lambda s: np.isclose(s[0], L)
+# )
 u_boundary_dofs = locate_dofs_topological(u_function_space, mesh.topology.dim-1, left_boundary)
 v_boundary_dofs = locate_dofs_topological(v_function_space, mesh.topology.dim-1, left_boundary)
+# u_boundary_dofs_ = locate_dofs_topological(u_function_space, mesh.topology.dim-1, right_boundary)
+# v_boundary_dofs_ = locate_dofs_topological(v_function_space, mesh.topology.dim-1, right_boundary)
 
 boundary_conditions = [
     dirichletbc(PETSc.ScalarType(0), u_boundary_dofs, u_function_space),
     dirichletbc(PETSc.ScalarType(0), v_boundary_dofs, v_function_space),
+    # dirichletbc(PETSc.ScalarType(0), u_boundary_dofs_, u_function_space),
+    # dirichletbc(PETSc.ScalarType(0), v_boundary_dofs_, v_function_space),
 ]
 
 def mat_to_np(A):
@@ -138,6 +156,7 @@ built_np_matrices = {
 built_vectors = {name: assemble_vector(form(vec)) for name, vec in system_vectors.items()}
 for vec in built_vectors.values():
     vec.assemble()
+    set_bc(vec, bcs=boundary_conditions)
 built_np_vectors = {
     name:
         vec_to_np(
@@ -243,7 +262,7 @@ def implicit_midpoint_method(fun_lhs, fun_rhs, t_span, steps, y0, args):
                 ((y[n] + x) / 2).reshape((dim,)),
                 args
             ),
-            y[0]
+            y[n]
         )
         t_n += step_size
 
@@ -270,61 +289,151 @@ y_solution = implicit_midpoint_method(
     args=args_mat
 )
 
-u_sol = y_solution[:, dimu+dimv+1 : 2*dimu+dimv+1]
-v_sol = y_solution[:, 2*dimu+dimv+1 : 2*(dimu+dimv)+1]
-theta_sol = y_solution[:, -1]
+u_sol = y_solution[:, : dimu]
+v_sol = y_solution[:, dimu : dimu+dimv]
+theta_sol = y_solution[:, dimu+dimv]
+# u_sol = y_solution[:, dimu+dimv+1 : 2*dimu+dimv+1]
+# v_sol = y_solution[:, 2*dimu+dimv+1 : 2*(dimu+dimv)+1]
+# theta_sol = y_solution[:, -1]
 
 
+x_coordinates = mesh.geometry.x
+
+bb_tree = BoundingBoxTree(mesh, mesh.topology.dim)
+cell_candidates = compute_collisions(bb_tree, x_coordinates)
+colliding_cells = compute_colliding_cells(mesh, cell_candidates, x_coordinates)
+cells = []
+points_on_proc = []
+for i, point in enumerate(x_coordinates):
+    if len(colliding_cells.links(i)) > 0:
+        points_on_proc.append(point)
+        cells.append(colliding_cells.links(i)[0])
+points_on_proc = np.array(points_on_proc, dtype=np.float64)
+
+
+u_eval = np.zeros((y_solution.shape[0], points_on_proc.shape[0]))
+v_eval = np.zeros((y_solution.shape[0], points_on_proc.shape[0]))
+for i in range(y_solution.shape[0]):
+    u_loc = Function(u_function_space)
+    u_loc.x.array[:] = u_sol[i]
+    u_eval[i] = u_loc.eval(points_on_proc, cells).reshape(-1,)
+    v_loc = Function(v_function_space)
+    v_loc.x.array[:] = v_sol[i]
+    v_eval[i] = v_loc.eval(points_on_proc, cells).reshape(-1,)
+
+
+x_displacement, y_displacement = np.zeros_like(u_eval), np.zeros_like(u_eval)
+x_no_displacement, y_no_displacement = np.zeros_like(u_eval), np.zeros_like(u_eval)
+for i in range(x_displacement.shape[0]):
+    x_displacement[i] = (R + points_on_proc[:, 0] + u_eval[i]) * np.cos(theta_sol[i]) \
+                        - v_eval[i] * np.sin(theta_sol[i])
+    y_displacement[i] = (R + points_on_proc[:, 0] + u_eval[i]) * np.sin(theta_sol[i]) \
+                        + v_eval[i] * np.cos(theta_sol[i])
+    x_no_displacement[i] = (R + points_on_proc[:, 0]) * np.cos(theta_sol[i])
+    y_no_displacement[i] = (R + points_on_proc[:, 0]) * np.sin(theta_sol[i])
+
+
+plt.clf()
+for time_step in range(x_displacement.shape[0]):
+    if time_step % 10 == 0:
+        # plt.clf()
+        plt.plot(x_displacement[time_step], y_displacement[time_step])
+        plt.savefig(f"displacement_{time_step}.png")
+x_circle = np.linspace(0, R, num=10)
+plt.plot(x_circle, np.sqrt(R**2 - x_circle ** 2))
+
+min_displacement = min(x_displacement.min(), y_displacement.min())
+max_displacement = max(x_displacement.max(), y_displacement.max())
+plt.xlim((min_displacement, max_displacement))
+plt.ylim((min_displacement, max_displacement))
+plt.savefig(f"displacement_all.png")
+
+
+plt.clf()
+tip_displacement = np.zeros(x_displacement.shape[0])
+mid_displacement = np.zeros(x_displacement.shape[0])
+
+mid = int(x_displacement.shape[1] / 2)
+for i in range(x_displacement.shape[0]):
+    tip_displacement[i] = np.sqrt(u_eval[i, -1] ** 2 + v_eval[i, -1] ** 2)
+    mid_displacement[i] = np.sqrt(u_eval[i, mid] ** 2 + v_eval[i, mid] ** 2)
+plt.plot(np.linspace(0, T, num=x_displacement.shape[0]), tip_displacement)
+plt.plot(np.linspace(0, T, num=x_displacement.shape[0]), mid_displacement)
+
+plt.savefig(f"displacement_tip_mid.png")
+
+
+
+
+# START ANIMATION
+fig, ax = plt.subplots()
+ax.set_xlim(min_displacement, max_displacement)
+ax.set_ylim(min_displacement, max_displacement)
+
+line1, = ax.plot(x_displacement[0], y_displacement[0])
+line2, = ax.plot(x_no_displacement[0], y_no_displacement[0], "--")
+ax.add_patch(plt.Circle((0, 0), R))
+
+
+def animate(frame, x, y, x_, y_, lines):
+    lines[0].set_data(x[frame], y[frame])
+    lines[1].set_data(x_[frame], y_[frame])
+    return lines
+
+
+ani = FuncAnimation(
+    fig, animate, x_displacement.shape[0],
+    fargs=[x_displacement, y_displacement, x_no_displacement, y_no_displacement, [line1, line2]],
+    interval=25, blit=True
+)
+ani.save("displacement.gif")
+
+
+
+from IPython import embed
+embed()
+
+
+
+
+
+# print(original, displacement, original - displacement)
 
 
 # https://docs.fenicsproject.org/dolfinx/main/python/generated/dolfinx.fem.html
 # https://docs.fenicsproject.org/dolfinx/main/python/generated/dolfinx.cpp.common.html
 
-u_1 = Function(u_function_space)
-u_1.x.array[:] = u_sol[1]
-
-v_1 = Function(v_function_space)
-v_1.x.array[:] = v_sol[1]
-
-from IPython import embed
-embed()
-
-v_index_x = v_function_space.tabulate_dof_coordinates() #[:,0]
-v_1.eval(v_index_x, v_1)
-
-# v_function_space.dofmap.list
 
 
+# u_index_x = u_function_space.tabulate_dof_coordinates()[:, 0]
+# v_index_x = v_function_space.tabulate_dof_coordinates()[:, 0]
 
 
-# TODO: check how to interpolate array over whole function_space to get Function() object
-## or get all spatial coordinates
-u_ = Function(u_function_space)
-u_.vector.set_local(u_sol.reshape(-1,))
-u_.vector.apply("insert")
+# x_coordinates = mesh.geometry.x
+# u_values = [
+#     u_1.eval(x_coordinates[j+1], j)
+#     for j in range(10)
+# ]
+#
+# v_values = [
+#     v_1.eval(x_coordinates[j+1], j)
+#     for j in range(10)
+# ]
 
 
 
-
-
-from IPython import embed
-embed()
-
-
+# num_cells = mesh.topology.index_map(mesh.topology.dim).size_local
+#
+# v_dolfmap_list = [v_function_space.dofmap.cell_dofs(i) for i in range(num_cells)]
 
 
 
-
-
-
-
-
-
-
-
-
-
-
+#
+# x_indices = mesh.entities_to_geometry(
+#     mesh, mesh.topology.dim, np.arange(num_cells, dtype=np.int32), False)
+# points = mesh.geometry.x
+# for cell in range(num_cells):
+#     vertex_coords = points[x_indices[cell]]
 
 
 
