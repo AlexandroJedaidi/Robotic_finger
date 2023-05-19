@@ -42,13 +42,24 @@ NUM_TIME_STEPS = 150
 T = 5 # 7.5
 
 
-def tau(t):
-    amp = 0.1
+def tau__(t):
+    amp = 2.
     freq = 5 # 1.
     return amp * np.cos(freq * t)
 
-# def tau(t): return 0.1 * np.exp(-t)
+def tau_(t): return 1.
 
+def tau(t):
+    t1 = T / 3.
+    t2 = 2 * T / 3.
+    if t < t2:
+        if t < t1:
+            tmp = 1.
+        else:
+            tmp = -1.
+    else:
+        tmp = 0.
+    return 2 * tmp
 
 L = 1.1               # beam length
 rho = 2700          # density
@@ -146,9 +157,10 @@ system_scalars = {
 built_matrices = {name: assemble_matrix(form(mat), bcs=boundary_conditions) for name, mat in system_matrices.items()}
 for mat in built_matrices.values():
     mat.assemble()
+# built_np_matrices = built_matrices
 built_np_matrices = {
     name:
-        mat_to_np(
+        mat_to_np(      # TODO: here instead get csr matrix
             built_matrices[name]
         )
     for name in system_matrices.keys()
@@ -179,7 +191,7 @@ def ode_lhs(t, y, args):
     # alpha = y[-1]
 
     m_alpha = np.array(
-        args["I_b"] + u.T.dot(args["K_u1"]).dot(u) + 2 * args["K_u2"].dot(u) + v.T.dot(args["K_v1"] - args["K_v2"]).dot(v)
+        I_h + args["I_b"] + u.T.dot(args["K_u1"]).dot(u) + 2 * args["K_u2"].dot(u) + v.T.dot(args["K_v1"] - args["K_v2"]).dot(v)
     ).reshape(1,1)
 
     mass_matrix_lower_right_block = np.block([
@@ -246,6 +258,7 @@ def implicit_midpoint_method(fun_lhs, fun_rhs, t_span, steps, y0, args):
     dim = y0.shape[0]
     y = np.zeros((steps, dim))
     y[0] = y_initial
+    # TODO: write function instead of lambda with x -> Vec s.t. fun_lhs/rhs -> Mat/Vec for efficiency
 
     step_size = (t_span[1] - t_span[0]) / steps
     t_n = 0
@@ -269,7 +282,7 @@ def implicit_midpoint_method(fun_lhs, fun_rhs, t_span, steps, y0, args):
     return y
 
 
-dimu = built_np_matrices["M_u"].shape[0]
+dimu = built_np_matrices["M_u"].shape[0]     # for petsc use size instead of shape
 dimv = built_np_matrices["M_v"].shape[0]
 args_mat = built_np_matrices | built_np_vectors | built_scalars | {"u_dim": dimu, "v_dim": dimv, "tau": tau}
 
@@ -333,35 +346,36 @@ for i in range(x_displacement.shape[0]):
     y_no_displacement[i] = (R + points_on_proc[:, 0]) * np.sin(theta_sol[i])
 
 
-plt.clf()
-for time_step in range(x_displacement.shape[0]):
-    if time_step % 10 == 0:
-        # plt.clf()
-        plt.plot(x_displacement[time_step], y_displacement[time_step])
-        plt.savefig(f"displacement_{time_step}.png")
-x_circle = np.linspace(0, R, num=10)
-plt.plot(x_circle, np.sqrt(R**2 - x_circle ** 2))
+# plt.clf()
+# for time_step in range(x_displacement.shape[0]):
+#     if time_step % 10 == 0:
+#         # plt.clf()
+#         plt.plot(x_displacement[time_step], y_displacement[time_step])
+#         plt.savefig(f"displacement_{time_step}.png")
+# x_circle = np.linspace(0, R, num=10)
+# plt.plot(x_circle, np.sqrt(R**2 - x_circle ** 2))
+# plt.xlim((min_displacement, max_displacement))
+# plt.ylim((min_displacement, max_displacement))
+# plt.savefig(f"displacement_all.png")
 
 min_displacement = min(x_displacement.min(), y_displacement.min())
 max_displacement = max(x_displacement.max(), y_displacement.max())
-plt.xlim((min_displacement, max_displacement))
-plt.ylim((min_displacement, max_displacement))
-plt.savefig(f"displacement_all.png")
 
 
-plt.clf()
-tip_displacement = np.zeros(x_displacement.shape[0])
-mid_displacement = np.zeros(x_displacement.shape[0])
 
-mid = int(x_displacement.shape[1] / 2)
+u_tip_displacement = np.zeros(x_displacement.shape[0])
+v_tip_displacement = np.zeros(x_displacement.shape[0])
+
+# mid = int(x_displacement.shape[1] / 2)
 for i in range(x_displacement.shape[0]):
-    tip_displacement[i] = np.sqrt(u_eval[i, -1] ** 2 + v_eval[i, -1] ** 2)
-    mid_displacement[i] = np.sqrt(u_eval[i, mid] ** 2 + v_eval[i, mid] ** 2)
-plt.plot(np.linspace(0, T, num=x_displacement.shape[0]), tip_displacement)
-plt.plot(np.linspace(0, T, num=x_displacement.shape[0]), mid_displacement)
-
-plt.savefig(f"displacement_tip_mid.png")
-
+    u_tip_displacement[i] = u_eval[i, -1]
+    v_tip_displacement[i] = v_eval[i, -1]
+plt.plot(np.linspace(0, T, num=x_displacement.shape[0]), u_tip_displacement)
+plt.savefig(f"out/displacement_tip_u.png")
+plt.clf()
+plt.plot(np.linspace(0, T, num=x_displacement.shape[0]), v_tip_displacement)
+plt.savefig(f"out/displacement_tip_v.png")
+plt.clf()
 
 
 
@@ -386,7 +400,7 @@ ani = FuncAnimation(
     fargs=[x_displacement, y_displacement, x_no_displacement, y_no_displacement, [line1, line2]],
     interval=25, blit=True
 )
-ani.save("displacement.gif")
+ani.save("out/displacement.gif")
 
 
 
@@ -394,6 +408,12 @@ from IPython import embed
 embed()
 
 
+
+
+# links regarding csr matrix
+# https://stackoverflow.com/questions/36969886/using-a-sparse-matrix-versus-numpy-array
+# https://fenicsproject.discourse.group/t/converting-to-scipy-sparse-matrix-without-eigen-backend/847
+# https://stackoverflow.com/questions/36782588/dot-product-sparse-matrices
 
 
 
@@ -484,7 +504,7 @@ embed()
 # C_v = assemble_vector(
 #     form(rho * A * (R + x[0]) * z * dx)
 # )
-# I_b = assemble_scalar(		# TODO: assemble_scalar does not work ImportError
+# I_b = assemble_scalar(
 #     form(rho * A * (R + x[0])**2 * dx)
 # )
 
@@ -500,17 +520,11 @@ embed()
 
 
 # https://fenicsproject.org/olddocs/dolfinx/dev/python/_autogenerated/dolfinx.fem.assemble.html
-# TODO: I_h missing, should be in m_alpha
+#I_h missing, should be in m_alpha
 
 
 # https://jsdokken.com/dolfinx-tutorial/chapter2/linearelasticity_code.html#stress-computation
 
-
-
-
-# TODO: after solving ODE and getting an matrix with each col being the sol for given timestep 
-## split after that in (u, v, theta) vector and calculate 
-## Point_new = rotation_matrix_from_theta * [R + Point_old_x + u, v]
 
 
 
