@@ -376,6 +376,9 @@ plt.clf()
 plt.plot(np.linspace(0, T, num=x_displacement.shape[0]), v_tip_displacement)
 plt.savefig(f"out/displacement_tip_v.png")
 plt.clf()
+plt.plot(np.linspace(0, T, num=x_displacement.shape[0]), theta_sol)
+plt.savefig(f"out/displacement_theta_v.png")
+plt.clf()
 
 
 
