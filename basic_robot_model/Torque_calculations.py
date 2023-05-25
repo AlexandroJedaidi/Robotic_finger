@@ -1,4 +1,4 @@
-# here we will calculate the torque of the system.
+# here we will calculate the torque of the joints
 import numpy as np
 
 
