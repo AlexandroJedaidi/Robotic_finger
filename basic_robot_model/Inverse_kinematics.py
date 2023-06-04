@@ -1,6 +1,7 @@
 import numpy as np
 from Torque_calculations import system_torque
-from Trajectory_Testing import q, qd, qdd
+from Trajectory_Testing import q, qd
+qdd = np.zeros((2, len(q[0])))
 import matplotlib.pyplot as plt
 
 a1 = 3
@@ -47,12 +48,24 @@ for i in range(len(q[0])):
     link_torques[0][i] = torque_1
     link_torques[1][i] = torque_2
 
-# # plotting the torques
-#
+# plotting the torques
+
 # for i in range(len(q[0])):
 #     plt.plot(link_torques[0], label ="link_1_torque")
 #     plt.plot(link_torques[1], label ="link_2_torque")
-#     plt.title(f'torques_testing in each step{i}')
+#     plt.title(f'torques in each step{i}')
 #     plt.legend()
 #     plt.show()
-print(link_torques)
+# calculating matrix g = T(Θ,Θ ̇,0) in terms of th and thdot
+rho = link_torques   # while putting both th1ddot,th2ddot = 0
+# print(rho)
+# for i in range(len(q[0])):
+#     plt.plot(g[0], label ="link_1_torque")
+#     plt.plot(g[1], label ="link_2_torque")
+#     plt.title(f'torques_inverse_Kinematics in each step{i}')
+#     plt.legend()
+#     plt.show()
+# M(Θ)·ei=T(Θ,Θ ̇,ei)−T(Θ,Θ ̇,0)
+
+# Calculating M(Θ)
+

@@ -1,4 +1,4 @@
-# here we will calculate the torque of the joints
+# L -26, here we will calculate the torque of the joints
 import numpy as np
 
 
@@ -12,10 +12,11 @@ def system_torque(
 
 
     '''
+    Joints - Two types - Prismatic, Revolute we have only revolute joints here.
     system torque will provide the torque for both the joints tau1 and tau2.
     dh_table is the DH para,meters of our finger model.
-    th1- Angle of first link from ground
-    th2- Angle of 2nd link with respect to first link
+    th1- Angle of first link from ground (between x0, x1)
+    th2- Angle of 2nd link with respect to first link ( between x1,x2)
     a1-  First link length
     a2 - second link length
     th1dot - first joint angular velocity
@@ -30,11 +31,13 @@ def system_torque(
     alpha - link twist angle between zi-1 to zi along xi-1
     a - link lengths
     theta -  (joint angles) angle between xi to xi-1 along zi
-    d - joint distances between xi and xi-1 along zi
+    d - distances between xi and xi-1 along zi
     t - Total transformation matrix
     tdh - Transformation matrix of each joint frame
     x1, y1, z1 - location of center of mass of link 1
     x2, y2, z2 - location of center of mass of link 2
+    we calculate DH parameters to get the relative information
+    between 2 joints
     '''
 
     # above we have defined the DH table to get the dh parameters for the system
@@ -59,7 +62,7 @@ def system_torque(
     # A = np.empty()
 
     n = 3  # number of joint frames including end effector
-    tdh = np.empty((3, 4, 4))  # defining tdh Arm matrix
+    tdh = np.empty((3, 4, 4))  # defining tdh "Arm matrix"
     for i in range(n):
         tdh[i] = np.array([
                    [np.cos(theta[i]), -np.sin(theta[i]), 0, a[i]],
@@ -72,13 +75,13 @@ def system_torque(
     t1_2 = tdh[1]  # TRANSFORMATION MATRIX -2
     t2_3 = tdh[2]  # TRANSFORMATION MATRIX -3
 
-    # position vectors
-    a = t[:, 3]
-    p = a[:2]
+    # # position vectors
+    # a = t[:, 3]
+    # p = a[:, 2]
 
     # Velocity kinematics
     r01 = t0_1[0:3, 0:3]  # rotation matrix of joint 1
-    p01 = t0_1[0:3, 3]    # vector from the origin of frame 0 to the origin of frame 1
+    p01 = t0_1[0:3, 3]    # vector from the origin of frame 0 to the origin of frame 1 position vector
     r12 = t1_2[0:3, 0:3]  # rotation matrix of joint 2
     p12 = t1_2[0:3, 3]    # vector from the origin of frame 1 to the origin of frame 2
     r23 = t2_3[0:3, 0:3]  # rotation matrix of joint 3
@@ -86,17 +89,17 @@ def system_torque(
 
     # Angular velocity propagation
 
-    w0 = np.zeros((3, 1))
-    w1 = r01 @ w0 + np.array([0, 0, th1dot])
-    w2 = r12 @ w1 + np.array([0, 0, th2dot])
-    w3 = r23 @ w2
+    w0 = np.array([0, 0, 0])
+    w1 = (r01 @ w0 + np.array([0, 0, th1dot]))
+    w2 = (r12 @ w1 + np.array([0, 0, th2dot]))
+    w3 = (r23 @ w2)
 
     # End effector angular velocity w.r.t base
     w04 = r01 @ r12 @ r23
 
     # Linear velocity propagation
 
-    v0 = np.zeros((3, 1))
+    v0 = np.array([0, 0, 0])
     v1 = r01 @ (v0 + np.cross(w0, p01))
     v2 = r12 @ (v1 + np.cross(w1, p12))
     v3 = r23 @ (v2 + np.cross(w2, p23))
@@ -114,9 +117,9 @@ def system_torque(
 
     # Angular acceleration vectors
 
-    al0 = np.zeros((3, 1))
-    al1 = r01 @ (al0+np.cross(w0, np.array([0, 0, th1ddot])))
-    al2 = r12 @ (al1+np.cross(w1, np.np.array([0, 0, th2ddot])))
+    al0 = np.array([0, 0, 0])
+    al1 = r01 @ (al0+np.cross(w0, np.array([0, 0, th1dot]))) + np.array([0, 0, th1ddot])
+    al2 = r12 @ (al1+np.cross(w1, np.array([0, 0, th2dot]))) + np.array([0, 0, th2ddot])
     al3 = r23 @ al2
 
     # Linear accelerations
@@ -143,13 +146,13 @@ def system_torque(
 
     # torques acting on the links
 
-    tau_1 = i1 @ al1 + np.cross(w1, (i1 @ w1))
-    tau_2 = i2 @ al2 + np.cross(w2, (i2 @ w2))
+    tau_1 = (i1 @ al1) + np.cross(w1, (i1 @ w1))
+    tau_2 = (i2 @ al2) + np.cross(w2, (i2 @ w2))
 
     # Calculating the Joint forces and joint torques from link 2 to link 0
 
-    f3 = np.zeros((3, 1))
-    n3 = np.zeros((3, 1))
+    f3 = np.array([0, 0, 0])
+    n3 = np.array([0, 0, 0])
 
     # Joint forces
 
@@ -159,9 +162,9 @@ def system_torque(
 
     # Joint Moments
 
-    n2 = r23 @ n3 + np.cross(pc2, if2) + np.cross(p23, (r23 @ f3)) + tau_2
-    n1 = r12 @ n2 + np.cross(pc1, if1) + np.cross(p12, (r12 @ f2)) + tau_1
-    n0 = r01 @ n1 + np.cross(p01, (r01 @ f1))
+    n2 = (r23 @ n3) + np.cross(pc2, if2) + np.cross(p23, (r23 @ f3)) + tau_2
+    n1 = (r12 @ n2) + np.cross(pc1, if1) + np.cross(p12, (r12 @ f2)) + tau_1
+    n0 = (r01 @ n1) + np.cross(p01, (r01 @ f1))
 
     # Final joint torques acting along z axis here we will take the zth component of n1 and n2
 
