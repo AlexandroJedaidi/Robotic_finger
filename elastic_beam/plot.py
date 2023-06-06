@@ -33,21 +33,16 @@ def plot_displacements(u_solution, v_solution, theta_solution, parameters, name)
     ax[3].set_xlabel(r"time $t$")
     ax[3].set_ylabel(r"torque $\tau$")
 
-    # fig0.suptitle("")
     fig.savefig(f"elastic_beam/out/{name}.png")
-    # fig.savefig("out/displacement")
 
 
 def animate_displacements_frame(frame, x_displacement, y_displacement, x_no_displacement, y_no_displacement, lines):
     lines[0].set_data(x_displacement[frame], y_displacement[frame])
     lines[1].set_data(x_no_displacement[frame], y_no_displacement[frame])
-    # ax.set_title(f"Dynamics of rotating Euler-bernoulli beam at t={frame * T / NUM_TIME_STEPS}s")
     return lines
 
 
 def animate_displacements(x_displacement, y_displacement, x_no_displacement, y_no_displacement, parameters, name):
-
-    # START ANIMATION
     fig, ax = plt.subplots()
     min_displacement = min(x_displacement.min(), y_displacement.min())
     max_displacement = max(x_displacement.max(), y_displacement.max())
@@ -69,4 +64,3 @@ def animate_displacements(x_displacement, y_displacement, x_no_displacement, y_n
         interval=25, blit=True
     )
     ani.save(f"elastic_beam/out/{name}.gif")
-    # ani.save("out/displacement.gif")

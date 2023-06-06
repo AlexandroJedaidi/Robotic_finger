@@ -7,15 +7,6 @@ import basix
 from mpi4py import MPI
 
 
-def define_system_forms():
-    ...
-
-
-def assemble_system():
-    ...
-
-
-
 def create_mesh_and_function_spaces(parameters):
     mesh = create_interval(MPI.COMM_WORLD, parameters.num_space_elements, [0, parameters.L])
     u_element = basix.ufl_wrapper.create_element(
@@ -46,7 +37,6 @@ def define_boundary_conditions(mesh, function_spaces):
 
 
 def get_nodes_for_function_eval(u_solution, v_solution, mesh, function_spaces, parameters):
-    # y_solution.shape[0] is parameters.num_time_steps
     mesh_coordinates = mesh.geometry.x
 
     bb_tree = BoundingBoxTree(mesh, mesh.topology.dim)
@@ -75,7 +65,6 @@ def get_nodes_for_function_eval(u_solution, v_solution, mesh, function_spaces, p
 
 
 def calculate_displacements_in_origin_frame(u_solution, v_solution, theta_solution, x_coordinates, parameters):
-    # x_coordinates is points_on_proc[:, 0]
     x_displacement, y_displacement = np.zeros_like(u_solution), np.zeros_like(u_solution)
     x_no_displacement, y_no_displacement = np.zeros_like(u_solution), np.zeros_like(u_solution)
     for i in range(x_displacement.shape[0]):
