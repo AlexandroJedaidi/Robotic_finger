@@ -31,54 +31,55 @@ parameters = ModelParameters(
     tau=torque,
 )
 
-#################### ASSEMBLE FEM SYSTEM ####################
-mesh, function_spaces = create_mesh_and_function_spaces(parameters)
-boundary_conditions = define_boundary_conditions(mesh, function_spaces)
-system = ModelFEMSystem(parameters, mesh, function_spaces)
-system.assemble_system(boundary_conditions)
+if __name__ == "__main__":
+    #################### ASSEMBLE FEM SYSTEM ####################
+    mesh, function_spaces = create_mesh_and_function_spaces(parameters)
+    boundary_conditions = define_boundary_conditions(mesh, function_spaces)
+    system = ModelFEMSystem(parameters, mesh, function_spaces)
+    system.assemble_system(boundary_conditions)
 
-#################### SOLVE INITIAL VALUE PROBLEM ####################
-y0 = np.block([
-    [np.zeros((system.dim_u + system.dim_v, 1))],
-    [np.array(parameters.theta_initial).reshape(1, 1)],
-    [np.zeros((system.dim_u + system.dim_v, 1))],
-    [np.array(parameters.alpha_initial).reshape(1, 1)],
-]).reshape(-1,)
-y_solution = ode_solver(
-    fun_lhs=ode_lhs,
-    fun_rhs=ode_rhs,
-    t_span=(0, parameters.T),
-    steps=parameters.num_time_steps,
-    y0=y0,
-    parameters=parameters,
-    system=system
-)
+    #################### SOLVE INITIAL VALUE PROBLEM ####################
+    y0 = np.block([
+        [np.zeros((system.dim_u + system.dim_v, 1))],
+        [np.array(parameters.theta_initial).reshape(1, 1)],
+        [np.zeros((system.dim_u + system.dim_v, 1))],
+        [np.array(parameters.alpha_initial).reshape(1, 1)],
+    ]).reshape(-1,)
+    y_solution = ode_solver(
+        fun_lhs=ode_lhs,
+        fun_rhs=ode_rhs,
+        t_span=(0, parameters.T),
+        steps=parameters.num_time_steps,
+        y0=y0,
+        parameters=parameters,
+        system=system
+    )
 
-#################### GET SOLUTION AT MESH NODES ####################
-u_solution, v_solution, x_coordinates = get_nodes_for_function_eval(
-    y_solution[:, : system.dim_u],
-    y_solution[:, system.dim_u : system.dim_u + system.dim_v],
-    mesh,
-    function_spaces,
-    parameters
-)
-theta_solution = y_solution[:, system.dim_u + system.dim_v]
+    #################### GET SOLUTION AT MESH NODES ####################
+    u_solution, v_solution, x_coordinates = get_nodes_for_function_eval(
+        y_solution[:, : system.dim_u],
+        y_solution[:, system.dim_u : system.dim_u + system.dim_v],
+        mesh,
+        function_spaces,
+        parameters
+    )
+    theta_solution = y_solution[:, system.dim_u + system.dim_v]
 
-#################### GET SOLUTION IN CARTESIAN COORDINATES ####################
-x_displacement, y_displacement, x_no_displacement, y_no_displacement = calculate_displacements_in_origin_frame(
-    u_solution, v_solution, theta_solution, x_coordinates[:, 0], parameters
-)
+    #################### GET SOLUTION IN CARTESIAN COORDINATES ####################
+    x_displacement, y_displacement, x_no_displacement, y_no_displacement = calculate_displacements_in_origin_frame(
+        u_solution, v_solution, theta_solution, x_coordinates[:, 0], parameters
+    )
 
-#################### PLOT AND ANIMATE SOLUTION ####################
-file_name = "elastic_beam_with_piecewise_torque"
-plot_displacements(
-    u_solution, v_solution, theta_solution, parameters, file_name
-)
-animate_displacements(
-    x_displacement, y_displacement, x_no_displacement, y_no_displacement, parameters, file_name
-)
+    #################### PLOT AND ANIMATE SOLUTION ####################
+    file_name = "elastic_beam_with_piecewise_torque"
+    plot_displacements(
+        u_solution, v_solution, theta_solution, parameters, file_name
+    )
+    animate_displacements(
+        x_displacement, y_displacement, x_no_displacement, y_no_displacement, parameters, file_name
+    )
 
-#################### END OF FILE ####################
-from IPython import embed
+    #################### END OF FILE ####################
+    from IPython import embed
 
-embed()
+    embed()
