@@ -30,7 +30,7 @@ iyz2 = 6
 g = 9.8
 
 
-def M_matrix (th1,th2, th1dot, th2dot):
+def M_matrix (th1, th2, th1dot, th2dot):
     M = np.zeros((2, 2))
     T = np.zeros((2, 2))
     thddot = np.array([[0, 1], [1, 0]])

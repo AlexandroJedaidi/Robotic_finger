@@ -13,10 +13,10 @@ def plot_joint_trajectory(q, qd, qdd):
     timesteps = np.linspace(0, 1, num=m)
     n = q.shape[0]
     #
-    # # plotting subplots
-    # fig, axis = plt.subplots(3)
-    # fig.suptitle("Joint trajectory")
-    #
+    # plotting subplots
+    fig, axis = plt.subplots(3)
+    fig.suptitle("Joint trajectory")
+
     # # Position
     # axis[0].set_title("Position")
     # axis[0].set(xlabel="Time", ylabel=" Position")
@@ -43,10 +43,10 @@ def plot_joint_trajectory(q, qd, qdd):
     #     axis[2].plot(timesteps, qdd[i])
     #     # axis[2].legend(f"Joint{i + 1}")
     # # legends
-    # # legends = [f"Joint_{i+1}" for i in range(n)]
-    # # axis[0].legend(legends)
-    # # axis[1].legend(legends)
-    # # axis[2].legend(legends)
-    # # fig.tight_layout()
-    # # plt.show()
-
+    # legends = [f"Joint_{i+1}" for i in range(n)]
+    # axis[0].legend(legends)
+    # axis[1].legend(legends)
+    # axis[2].legend(legends)
+    # fig.tight_layout()
+    # plt.show()
+    #

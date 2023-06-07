@@ -15,7 +15,7 @@ We are considering the time frame t [0:1]
 import numpy as np
 
 
-def cubic_trajectory_plannign(q0, qf, qd0, qdf, m=100):
+def cubic_trajectory_plannign(q0, qf, qd0, qdf, m=1000):
     n = q0.shape[0]  # check in jupyter note_book # shape of q0 and a0 needs to be same
     # polynomial Parameters
 
@@ -28,9 +28,9 @@ def cubic_trajectory_plannign(q0, qf, qd0, qdf, m=100):
 
     time_steps = np.linspace(0, 1, num=m)
 
-    # Now we can formulate the putputs we are looking for q - position, qd - ve;ocity, qdd
-    # acceleration
-
+    # # Now we can formulate the putputs we are looking for q - position, qd - ve;ocity, qdd
+    # # acceleration
+    #
     q = np.zeros((n, m))
     qd = np.zeros((n, m))
     qdd = np.zeros((n, m))
@@ -45,4 +45,6 @@ def cubic_trajectory_plannign(q0, qf, qd0, qdf, m=100):
         qdd[:, i] = (2 * a2) + 6 * a3 * t1
 
     return q, qd, qdd
+
+
 

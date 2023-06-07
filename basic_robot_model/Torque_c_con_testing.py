@@ -47,12 +47,12 @@ for i in range(len(q[0])):
     link_torques[0][i] = torque_1
     link_torques[1][i] = torque_2
 
-# # plotting the torques
-#
+# plotting the torques
+
 # for i in range(len(q[0])):
 #     plt.plot(link_torques[0], label ="link_1_torque")
 #     plt.plot(link_torques[1], label ="link_2_torque")
 #     plt.title(f'torques_testing in each step{i}')
 #     plt.legend()
 #     plt.show()
-print(link_torques)
+# print(link_torques)
