@@ -76,7 +76,6 @@ def ode_solver(fun_lhs, fun_rhs, t_span, steps, y0, parameters, system):
     dim = y0.shape[0]
     y = np.zeros((steps, dim))
     y[0] = y0
-    # TODO: write function instead of lambda with x -> Vec s.t. fun_lhs/rhs -> Mat/Vec for efficiency
 
     def implicit_midpoint_method(x):
         return (

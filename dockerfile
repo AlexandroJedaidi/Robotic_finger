@@ -4,7 +4,7 @@ WORKDIR /app
 ENV DEBIAN_FRONTEND noninteractive
 RUN apt-get update && apt-get install -y software-properties-common
 RUN apt-get update && apt-get -y install python3-pip
-RUN pip3 install numpy matplotlib casadi scipy ipython
+RUN pip3 install numpy matplotlib casadi scipy ipython pandas
 RUN add-apt-repository ppa:fenics-packages/fenics
 RUN apt update
 RUN apt -y install fenicsx
