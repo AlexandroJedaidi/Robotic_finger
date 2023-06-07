@@ -3,32 +3,35 @@ from matplotlib.animation import FuncAnimation
 import numpy as np
 
 
-def plot_displacements(u_solution, v_solution, theta_solution, parameters, name):
+def plot_displacements(u_solutions, v_solutions, theta_solutions, t_space, parameters, name):
 
     fig, ax = plt.subplots(4,1, figsize=(10, 15), constrained_layout=True)
-    mid_point_index = int(u_solution.shape[1] / 2)
-    t_space = np.linspace(0, parameters.T, num=parameters.num_time_steps)
+    t_spaces = [
+        np.linspace(0, parameters.T, num=parameters.num_time_steps),
+        t_space
+    ]
 
-    ax[0].plot(t_space, u_solution[:,-1], label="tip")
-    ax[0].plot(t_space, u_solution[:,mid_point_index], label="mid")
+    ax[0].plot(t_spaces[0], u_solutions[0][:,-1], label="python")
+    ax[0].plot(t_spaces[1], u_solutions[1][:,-1], label="ansys")
     ax[0].legend()
     ax[0].set_title("Axial displacements of the beam")
     ax[0].set_xlabel(r"time $t$")
     ax[0].set_ylabel(r"distance $u$")
 
-    ax[1].plot(t_space, v_solution[:,-1], label="tip")
-    ax[1].plot(t_space, v_solution[:,mid_point_index], label="mid")
+    ax[1].plot(t_spaces[0], v_solutions[0][:,-1], label="python")
+    ax[1].plot(t_spaces[1], v_solutions[1][:,-1], label="ansys")
     ax[1].legend()
     ax[1].set_title("Transverse displacements of the beam")
     ax[1].set_xlabel(r"time $t$")
     ax[1].set_ylabel(r"distance $v$")
 
-    ax[2].plot(t_space, theta_solution)
+    ax[2].plot(t_spaces[0], theta_solutions[0], label="python")
+    ax[2].plot(t_spaces[1], theta_solutions[1], label="ansys")
     ax[2].set_title("Rotation of the beam")
     ax[2].set_xlabel(r"time $t$")
     ax[2].set_ylabel(r"angle $\theta$")
 
-    ax[3].plot(t_space, [parameters.tau(t_i) for t_i in t_space])
+    ax[3].plot(t_spaces[0], [parameters.tau(t_i) for t_i in t_spaces[0]])
     ax[3].set_title("Supplied torque from actuator")
     ax[3].set_xlabel(r"time $t$")
     ax[3].set_ylabel(r"torque $\tau$")

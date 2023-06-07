@@ -9,6 +9,10 @@ from elastic_beam.assemble import (
 )
 from elastic_beam.model import ModelFEMSystem
 from elastic_beam.ode import ode_lhs, ode_rhs, ode_solver
+from elastic_beam.ansys import (
+    load_and_get_displacement_in_origin_frame_from_ansys,
+    calculate_displacements_in_rotating_frame
+)
 from elastic_beam.plot import plot_displacements, animate_displacements
 
 
@@ -70,10 +74,14 @@ if __name__ == "__main__":
         u_solution, v_solution, theta_solution, x_coordinates[:, 0], parameters
     )
 
+    #################### LOAD AND TRANSFORM ANSYS SOLUTION ####################
+    x_ansys, y_ansys, theta_ansys, t_ansys = load_and_get_displacement_in_origin_frame_from_ansys(parameters)
+    u_ansys, v_ansys = calculate_displacements_in_rotating_frame(x_ansys, y_ansys, theta_ansys)
+
     #################### PLOT AND ANIMATE SOLUTION ####################
     file_name = "elastic_beam_with_piecewise_torque"
     plot_displacements(
-        u_solution, v_solution, theta_solution, parameters, file_name
+        [u_solution, u_ansys], [v_solution, v_ansys], [theta_solution, theta_ansys], t_ansys, parameters, file_name
     )
     animate_displacements(
         x_displacement, y_displacement, x_no_displacement, y_no_displacement, parameters, file_name
